@@ -4,13 +4,16 @@ import io.reactivex.Completable;
 import io.reactivex.Observable;
 import io.reactivex.subjects.PublishSubject;
 import io.vertx.reactivex.core.Vertx;
+import org.apache.activemq.ActiveMQConnection;
 import org.apache.activemq.ActiveMQConnectionFactory;
+import org.apache.activemq.transport.TransportListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.jms.*;
-
+import java.io.IOException;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.vertx.reactivex.core.RxHelper.scheduler;
 
@@ -19,6 +22,7 @@ public class ActiveMqConsumer{
   private final Vertx vertx;
   private final ActiveMqConsumerOptions options;
   private final PublishSubject<Message> subject = PublishSubject.create();
+  private final AtomicBoolean connected = new AtomicBoolean(false);
 
   private Connection connection;
   private Session session;
@@ -34,6 +38,10 @@ public class ActiveMqConsumer{
 
   public static ActiveMqConsumer create(Vertx vertx, ActiveMqConsumerOptions options) {
     return new ActiveMqConsumer(vertx, options);
+  }
+
+  public boolean isConnected() {
+    return connected.get();
   }
 
   /**
@@ -53,7 +61,9 @@ public class ActiveMqConsumer{
       try {
         log.info("Trying to connect {}", url);
         connection = cf.createConnection();
+        ((ActiveMQConnection)connection).addTransportListener(new ConnectionListener(connected));
         connection.start();
+        connected.set(true);
         promise.complete();
       } catch (JMSException e) {
         try {
@@ -109,5 +119,33 @@ public class ActiveMqConsumer{
 
   private void onException(JMSException exception) {
     log.error("ActiveMq exception: {}", exception.getMessage());
+  }
+
+  private static class ConnectionListener implements TransportListener {
+    private final AtomicBoolean connected;
+
+    public ConnectionListener(AtomicBoolean connected) {
+      this.connected = connected;
+    }
+
+    @Override
+    public void onCommand(Object command) {
+
+    }
+
+    @Override
+    public void onException(IOException error) {
+
+    }
+
+    @Override
+    public void transportInterupted() {
+      connected.set(false);
+    }
+
+    @Override
+    public void transportResumed() {
+      connected.set(true);
+    }
   }
 }

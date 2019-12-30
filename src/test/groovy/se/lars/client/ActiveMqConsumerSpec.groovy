@@ -3,6 +3,7 @@ package se.lars.client
 import io.reactivex.observers.TestObserver
 import io.vertx.reactivex.core.Vertx
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.jms.TextMessage
 import java.time.Duration
@@ -12,6 +13,9 @@ import static se.lars.client.TestBroker.startBroker
 import static se.lars.client.TestTopicProducer.createProducer
 
 class ActiveMqConsumerSpec extends Specification {
+  @Delegate
+  PollingConditions conditions = new PollingConditions(timeout: 2)
+
   Vertx vertx
 
   def setup() {
@@ -32,8 +36,9 @@ class ActiveMqConsumerSpec extends Specification {
 
     when:
     consumer.connect("tcp://localhost:$port").blockingGet()
-    consumer.topic("topic")
-    consumer.listen()
+    consumer
+      .topic("topic")
+      .listen()
       .ofType(TextMessage)
       .map { it.text }
       .subscribe(subscriber)
@@ -58,6 +63,46 @@ class ActiveMqConsumerSpec extends Specification {
     broker.close()
   }
 
+  def "should connect and consume messages with selector"() {
+    given:
+    def port = ThreadLocalRandom.current().nextInt(1024, 10_000)
+    def broker = startBroker(port)
+    def producer = createProducer(port)
+    def consumer = ActiveMqConsumer.create(vertx)
+    def subscriber = new TestObserver()
+
+    when:
+    consumer.connect("tcp://localhost:$port").blockingGet()
+    consumer
+      .topic("topic", "JMSType in ('x', 'z')")
+      .listen()
+      .ofType(TextMessage)
+      .map { it.text }
+      .subscribe(subscriber)
+
+    and:
+    producer.send("a", "x")
+    producer.send("b", "y")
+    producer.send("c", "k")
+    producer.send("d", "z")
+
+    then:
+    subscriber.awaitCount(2)
+    subscriber.assertValues("a", "d")
+
+    when:
+    consumer.close()
+
+    then:
+    subscriber.awaitTerminalEvent()
+    subscriber.assertComplete()
+
+    cleanup:
+    producer.close();
+    broker.close()
+
+  }
+
   def "should reconnect and continue consume messages"() {
     given:
     def port = ThreadLocalRandom.current().nextInt(1024, 10_000)
@@ -68,8 +113,9 @@ class ActiveMqConsumerSpec extends Specification {
 
     when:
     consumer.connect("tcp://localhost:$port").blockingGet()
-    consumer.topic("topic")
-    consumer.listen()
+    consumer
+      .topic("topic")
+      .listen()
       .ofType(TextMessage)
       .map { it.text }
       .subscribe(subscriber)
@@ -86,15 +132,19 @@ class ActiveMqConsumerSpec extends Specification {
     broker.close()
     producer.close()
 
-    and: "and sleep for a short while"
-    sleep(2_000)
+    then: "await connection is closed"
+    eventually {
+      assert !consumer.connected
+    }
 
-    and: "start broker"
+    when: "resstart broker"
     broker = startBroker(port)
     producer = createProducer(port)
 
-    and: "given the consumer some time to reconnect"
-    sleep(2_000)
+    then: "consumer will eventually be reconnected"
+    eventually {
+      assert consumer.connected
+    }
 
     and: "produce more messages"
     producer.send("c")
@@ -126,7 +176,8 @@ class ActiveMqConsumerSpec extends Specification {
 
     when:
     consumer.connect("tcp://localhost:$port").subscribe(connectSobscriber)
-    consumer.listen()
+    consumer
+      .listen()
       .ofType(TextMessage)
       .map { it.text }
       .subscribe(subscriber)
@@ -139,6 +190,9 @@ class ActiveMqConsumerSpec extends Specification {
     def producer = createProducer(port)
 
     then: "await the connected successfully"
+    eventually {
+      assert consumer.connected
+    }
     connectSobscriber.awaitTerminalEvent()
     connectSobscriber.assertComplete()
 
