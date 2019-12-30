@@ -10,9 +10,11 @@ import org.slf4j.LoggerFactory;
 
 import javax.jms.*;
 
+import java.util.Objects;
+
 import static io.vertx.reactivex.core.RxHelper.scheduler;
 
-public class ActiveMqConsumer implements ExceptionListener{
+public class ActiveMqConsumer{
   private static final Logger log = LoggerFactory.getLogger(ActiveMqConsumer.class);
   private final Vertx vertx;
   private final ActiveMqConsumerOptions options;
@@ -21,10 +23,9 @@ public class ActiveMqConsumer implements ExceptionListener{
   private Connection connection;
   private Session session;
 
-
   private ActiveMqConsumer(Vertx vertx, ActiveMqConsumerOptions options) {
-    this.vertx = vertx;
-    this.options = options;
+    this.vertx = Objects.requireNonNull(vertx);
+    this.options = Objects.requireNonNull(options);
   }
 
   public static ActiveMqConsumer create(Vertx vertx) {
@@ -35,13 +36,18 @@ public class ActiveMqConsumer implements ExceptionListener{
     return new ActiveMqConsumer(vertx, options);
   }
 
+  /**
+   * Connects with the url and retries until succeeded signals with the Completable
+   */
   public Completable connect(String baseUrl) {
+    Objects.requireNonNull(baseUrl);
+
     String url = options.formatUrl(baseUrl);
     ActiveMQConnectionFactory cf = new ActiveMQConnectionFactory(url);
-    cf.setMaxThreadPoolSize(1);
-    cf.setOptimizeAcknowledge(true);
-    cf.setAlwaysSessionAsync(false);
-    cf.setExceptionListener(this);
+    cf.setMaxThreadPoolSize(1); // use as few threads as possible
+    cf.setOptimizeAcknowledge(true); // reduce server chatiness, might cause duplicate messages on reconnect - imptove performance
+    cf.setAlwaysSessionAsync(false); // use transport thread to deliver message, i.e. not via executor
+    cf.setExceptionListener(this::onException);
 
     return vertx.rxExecuteBlocking(promise -> {
       try {
@@ -63,11 +69,22 @@ public class ActiveMqConsumer implements ExceptionListener{
       .ignoreElement();
   }
 
+  /**
+   * create and attach to the topic
+   */
   public ActiveMqConsumer topic(String topic) {
+    Objects.requireNonNull(topic);
+    return topic(topic, null);
+  }
+
+  /**
+   * create and attach to the topic with selector
+   */
+  public ActiveMqConsumer topic(String topic, String selector) {
     try {
       session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
       Topic destination = session.createTopic(topic);
-      MessageConsumer consumer = session.createConsumer(destination);
+      MessageConsumer consumer = session.createConsumer(destination, selector);
       consumer.setMessageListener(subject::onNext);
     } catch (Exception e) {
       log.error("Failed to session and topic {}", topic, e);
@@ -77,19 +94,20 @@ public class ActiveMqConsumer implements ExceptionListener{
     return this;
   }
 
+  /**
+   * Returns hot observable to listen for a stream of messages
+   */
   public Observable<Message> listen() {
     return subject.observeOn(scheduler(vertx.getOrCreateContext()));
   }
 
   public void close() throws JMSException {
-    session.close();
-    connection.close();
     subject.onComplete();
-
+    if (session != null) session.close();
+    if (connection != null) connection.close();
   }
 
-  @Override
-  public void onException(JMSException exception) {
+  private void onException(JMSException exception) {
     log.error("ActiveMq exception: {}", exception.getMessage());
   }
 }

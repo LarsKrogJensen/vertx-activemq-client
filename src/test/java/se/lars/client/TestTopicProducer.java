@@ -35,6 +35,12 @@ public class TestTopicProducer {
     producer.send(textMessage);
   }
 
+  public void send(String message, String jmsType) throws Exception {
+    TextMessage textMessage = session.createTextMessage(message);
+    textMessage.setJMSType(jmsType);
+    producer.send(textMessage);
+  }
+
   public void close() throws Exception {
     if (session != null) session.close();
     if (connection != null) connection.close();
