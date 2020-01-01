@@ -6,7 +6,7 @@ import io.reactivex.subjects.PublishSubject;
 import io.vertx.reactivex.core.Vertx;
 import org.apache.activemq.ActiveMQConnection;
 import org.apache.activemq.ActiveMQConnectionFactory;
-import org.apache.activemq.transport.TransportListener;
+import org.apache.activemq.transport.DefaultTransportListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +121,7 @@ public class ActiveMqConsumer{
     log.error("ActiveMq exception: {}", exception.getMessage());
   }
 
-  private static class ConnectionListener implements TransportListener {
+  private static class ConnectionListener extends DefaultTransportListener {
     private final AtomicBoolean connected;
 
     public ConnectionListener(AtomicBoolean connected) {
@@ -129,13 +129,8 @@ public class ActiveMqConsumer{
     }
 
     @Override
-    public void onCommand(Object command) {
-
-    }
-
-    @Override
     public void onException(IOException error) {
-
+      log.error("ActiveMq transport exception: {}", error.getMessage());
     }
 
     @Override
