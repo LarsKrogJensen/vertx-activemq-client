@@ -5,9 +5,9 @@
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources/logback.xml" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/test/groovy/se/lars/client/ActiveMqConsumerSpec.groovy" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/src/test/java/TestBroker.java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/src/test/java/TestProducer.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/test/java/se/lars/client/TestBroker.java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/test/java/se/lars/client/TestTopicProducer.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/test/java/se/lars/client/Testststs.java" charset="UTF-8" />
     <file url="PROJECT" charset="windows-1252" />
   </component>
 </project>

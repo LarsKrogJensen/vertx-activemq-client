@@ -4,7 +4,6 @@ import io.reactivex.Completable;
 import io.reactivex.Observable;
 import io.reactivex.subjects.PublishSubject;
 import io.vertx.reactivex.core.Vertx;
-import org.apache.activemq.ActiveMQConnection;
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.activemq.transport.DefaultTransportListener;
 import org.slf4j.Logger;
@@ -56,12 +55,12 @@ public class ActiveMqConsumer{
     cf.setOptimizeAcknowledge(true); // reduce server chatiness, might cause duplicate messages on reconnect - imptove performance
     cf.setAlwaysSessionAsync(false); // use transport thread to deliver message, i.e. not via executor
     cf.setExceptionListener(this::onException);
+    cf.setTransportListener(new ConnectionListener(connected));
 
     return vertx.rxExecuteBlocking(promise -> {
       try {
         log.info("Trying to connect {}", url);
         connection = cf.createConnection();
-        ((ActiveMQConnection)connection).addTransportListener(new ConnectionListener(connected));
         connection.start();
         connected.set(true);
         promise.complete();
@@ -136,11 +135,13 @@ public class ActiveMqConsumer{
     @Override
     public void transportInterupted() {
       connected.set(false);
+      log.error("ActiveMq transport interrupted");
     }
 
     @Override
     public void transportResumed() {
       connected.set(true);
+      log.info("ActiveMq transport resomued");
     }
   }
 }

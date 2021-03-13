@@ -25,4 +25,9 @@ public class TestBroker {
       throw new RuntimeException(e);
     }
   }
+
+  public static void main(String[] args) throws InterruptedException {
+    startBroker(61617);
+    Thread.sleep(1000000);
+  }
 }

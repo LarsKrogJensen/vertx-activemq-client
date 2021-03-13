@@ -10,8 +10,8 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <vertx.version>3.8.4</vertx.version>
-    <activemq.version>5.15.11</activemq.version>
+    <vertx.version>3.9.4</vertx.version>
+    <activemq.version>5.16.0</activemq.version>
     <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
   </properties>
 
